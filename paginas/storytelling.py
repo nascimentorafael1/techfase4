@@ -5,6 +5,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime
+from statsmodels.tsa.seasonal import seasonal_decompose
 
 
 # Carregando dataframe
@@ -20,6 +21,7 @@ df_ipea_brent['data'] = pd.to_datetime(df_ipea_brent['data'])
 df_ipea_brent['preco_uss'] = df_ipea_brent['preco_uss'].str.replace(',','.')
 df_ipea_brent['preco_uss'] = pd.Series(df_ipea_brent['preco_uss'], dtype='Float64')
 df_ipea_brent = df_ipea_brent.set_index('data')
+df_ipea_brent = df_ipea_brent.sort_index()
 nome_dia_semana = {
     0: 'Segunda-feira',
     1: 'Terça-feira',
@@ -247,11 +249,88 @@ with tab2:
 
 
 with tab3:
- st.write('''
-            <div style="text-align: justify;">
-               **Em breve a análise temporal**
-            </div>
-            ''', unsafe_allow_html=True)  
+   st.empty()
+   
+   periodo = {
+    "Mensal": 30,
+    "Bimestral": 60,
+    "Trimestral": 90,
+    "Anual": 292
+   }
+ 
+   
+   periodo_valor = st.segmented_control(
+      "Selecione o Período", list(periodo.keys()), selection_mode="single"
+   )
+   
+   if periodo_valor != None:
+
+      periodo_decomposicao = periodo[periodo_valor]
+
+      st.write(f"Período selecionado: {periodo_decomposicao} dias")
+      
+      decomposicao = seasonal_decompose(df_ipea_brent['1988-01-01':'2024-12-31']['preco_uss'], model="additive", period=periodo_decomposicao)
+
+      # Gráfico de Tendência
+      fig_tendencia = go.Figure()
+
+      # Plotando a Tendência
+      fig_tendencia.add_trace(go.Scatter(
+      x=decomposicao.trend.index,
+      y=decomposicao.trend,
+      mode='lines',
+      name='Tendência',
+      line=dict(color='blue')
+      ))
+
+   # Configuração do layout
+      fig_tendencia.update_layout(
+         title="Tendência",
+         xaxis_title="Ano",
+         yaxis_title="Valor",
+         xaxis=dict(
+            tickvals=anos,
+            ticktext=[str(ano) for ano in anos],
+            tickformat="%Y"
+         ),
+         template="plotly_dark"
+      )
+
+      # Exibir gráfico no Streamlit
+      st.plotly_chart(fig_tendencia)
+
+      ultimo_ano = decomposicao.seasonal.index.year.max()
+
+      # Filtra os dados da sazonalidade para o último ano
+      dados_sazonalidade = decomposicao.seasonal[decomposicao.seasonal.index.year == ultimo_ano]
+
+      # Cria o gráfico
+      fig_sazonalidade = go.Figure()
+
+      fig_sazonalidade.add_trace(go.Scatter(
+         x=dados_sazonalidade.index,
+         y=dados_sazonalidade,
+         mode='lines',
+         name=f"Sazonalidade {ultimo_ano}",
+         line=dict(color='green')
+      ))
+
+      # Configura o layout para exibir o mês no eixo x
+      fig_sazonalidade.update_layout(
+         title=f"Sazonalidade de {ultimo_ano}",
+         xaxis_title="Mês",
+         yaxis_title="Valor",
+         xaxis=dict(
+            tickformat="%b",  # Mostra apenas o nome abreviado do mês (Jan, Feb, etc.)
+            ticklabelmode="period"  # Garante que o label represente o início do mês
+         ),
+         template="plotly_dark"
+      )
+
+      # Exibe o gráfico no Streamlit
+      st.plotly_chart(fig_sazonalidade)
+
+
 
 with tab4:
  st.write('''
