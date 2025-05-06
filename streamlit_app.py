@@ -5,35 +5,35 @@ st.set_page_config(layout="wide")
 home = st.Page(
     'paginas/home.py',
     title="Home",
-    icon=':material/home:',
+    icon='🏠',
     default=True
 )
 
 storytelling = st.Page(
     'paginas/storytelling.py',
     title="Storytelling",
-    icon=':material/description:',
+    icon='📄',
     default=False
 )
 
 dashboard = st.Page(
     'paginas/dashboard.py',
     title="Dashboard",
-    icon=':material/dashboard:',
+    icon='📊',
     default=False
 )
 
 predicao = st.Page(
     'paginas/predicao.py',
     title="Previsão",
-    icon=':material/query_stats:',
+    icon='📈',
     default=False
 )
 
 dados = st.Page(
     'paginas/dados.py',
     title="Dados Técnicos",
-    icon=':material/code:',
+    icon='🛠️',
     default=False
 )
 
