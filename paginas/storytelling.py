@@ -40,6 +40,12 @@ df_ipea_brent['bimestre'] = ((df_ipea_brent['mes'] - 1) // 2) + 1
 df_ipea_brent['trimestre'] = ((df_ipea_brent['mes'] - 1) // 3) + 1
 df_ipea_brent['semestre'] = ((df_ipea_brent['mes'] - 1) // 6) + 1
 
+df_ipea_brent['variacao'] = df_ipea_brent['preco_uss'].diff() # vendo a diferença do dia atual pelo dia anterior
+
+df_ipea_brent['p_variacao'] = ((df_ipea_brent['preco_uss'] / df_ipea_brent['preco_uss'].shift(1)) - 1) # Em porcentagem a diferença entre o dia atual e anterior
+
+df_ipea_brent = df_ipea_brent.drop(df_ipea_brent.index[0])
+
 
 #DataFrame de eventos
 
@@ -110,7 +116,9 @@ df_eventos_novos.set_index("data", inplace=True)
 # Array e DataFrames filtrados
 anos = df_ipea_brent['ano'].unique()
 precos_anuais = [df_ipea_brent[df_ipea_brent['ano'] == ano]['preco_uss'].mean().round(2) for ano in anos]
-
+df_grouped = df_ipea_brent.groupby('ano')['preco_uss'].mean().reset_index() # Agrupar por ano e calcular a média
+df_grouped['diferenca'] = ((df_grouped['preco_uss'] / df_grouped['preco_uss'].shift(1)) - 1) # Calcular a diferença ano a ano
+df_grouped = df_grouped.drop(df_grouped.index[0])
 
 
 #Funções
@@ -128,13 +136,14 @@ def plot_preco_brent(df, ano_inicial, ano_final, df_eventos=None, range_y=None):
         mode='lines',
         name='Preço do Brent (USD)',
         line=dict(color='#71C5E8', width=2),
-        customdata=df_filtrado[['nome_dia_semana']].values,
+        customdata=df_filtrado[['nome_dia_semana','p_variacao']].values,
         hovertemplate=(
             "<b>Data:</b> %{x|%d/%m/%Y}<br>" +
             "<b>Preço:</b> %{y:.2f} USD<br>" +
+            "<b>Variação Diária:</b> %{customdata[1]:.2%}<br>" +
             "<b>Dia da Semana:</b> %{customdata[0]}<br>" +
             "<extra></extra>"
-        )
+        )       
     ))
 
     # Adiciona anotações, se df_eventos for fornecido
@@ -181,10 +190,98 @@ def plot_preco_brent(df, ano_inicial, ano_final, df_eventos=None, range_y=None):
     st.plotly_chart(fig)
 
 
+
+
+
+def plot_preco_brent_anual(df_anual, ano_ini, ano_fim):
+    # Filtrar o DataFrame
+    df_ano = df_anual[(df_anual['ano'] >= ano_ini) & (df_anual['ano'] <= ano_fim)].copy()
+
+    # Criar o gráfico de barras
+    fig = go.Figure()
+
+    # Adicionar as barras
+    fig.add_trace(go.Bar(
+        x=df_ano['ano'],
+        y=df_ano['preco_uss'],
+        text=df_ano['preco_uss'].apply(lambda x: f"$ {x:.2f}"),
+        textposition='inside',
+        insidetextfont=dict(color='rgb(14, 17, 23)'),
+        marker_color='#71C5E8',
+        showlegend=False,
+        hoverinfo='skip'
+    ))
+
+    # Adicionar anotações com a variação percentual (coloridas)
+    for i, row in df_ano.iterrows():
+        if pd.notna(row['diferenca']):
+            cor = 'lightcoral' if row['diferenca'] < 0 else 'lightskyblue'
+            sinal = "+" if row['diferenca'] >= 0 else "−"
+            fig.add_annotation(
+                x=row['ano'],
+                y=row['preco_uss'] + 5,
+                text=f"<span style='color:{cor}'>{sinal}{abs(row['diferenca']):.2f}%</span>",
+                showarrow=False,
+                font=dict(size=11)
+            )
+
+    # Layout
+    fig.update_layout(
+        title=f'Preço Médio Anual do Petróleo Brent de {ano_ini} até {ano_fim}',
+        font=dict(color='white'),
+        xaxis=dict(tickmode='linear', tick0=ano_ini, dtick=1, title='Ano'),
+        yaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+        uniformtext_minsize=8,
+        uniformtext_mode='show',
+        showlegend=False,
+        hovermode=False
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
+
+
+
+
+def plot_var_brent(df, ano_inicial, ano_final):
+    # Filtra o DataFrame pelo intervalo de anos
+    df_filtrado = df[(df['ano'] >= ano_inicial) & (df['ano'] <= ano_final)]
+
+    # Criação da figura
+    fig = go.Figure()
+
+    # Linha da variação percentual
+    fig.add_trace(go.Scatter(
+        x=df_filtrado.index,
+        y=df_filtrado['p_variacao'],
+        mode='lines',
+        name='Variação Percentual do Brent',
+        line=dict(color='#71C5E8', width=2),
+    ))
+
+    # Configurações do layout
+    fig.update_layout(
+        title=f'Variação Percentual do Preço do Petróleo Brent de {ano_inicial} até {ano_final}',
+        xaxis_title='Data',
+        yaxis_title='Variação Percentual',
+        template='plotly_dark',
+        xaxis=dict(
+            tickformat='%Y',
+            dtick='M12'
+        ),
+        yaxis=dict(
+        tickformat='.0%',  # Formatar como percentual com 2 casas decimais
+    )
+    )
+
+    # Exibe no Streamlit
+    st.plotly_chart(fig, use_container_width=True)
+
+
+
 ######
 
 st.title('Storytelling')
-tab1, tab2, tab3, tab4 = st.tabs(["📈 Visão Geral", "💡 Insight", "📅 Análise Temporal","🛢️ Estoques"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["📈 Visão Geral", "💡 Insight", "📅 Análise Temporal", "↗️ Variações","🛢️ Estoques"])
 
 with tab1:
    st.write('Abaixo apresentamos a variação do preço brent ao longo dos anos, é possível filtrar o período e passar o mouse na linha do tempo para visualizar os valores')
@@ -221,30 +318,23 @@ with tab1:
 
 
 with tab2:
-      # Inicializa o estado na primeira execução
-      if 'periodo_selecionado' not in st.session_state:
-         st.session_state['periodo_selecionado'] = '1987 - 2000'  # padrão inicial
+         
+    periodo2 = (
+    "1987 - 2000",
+    "2000 - 2013",
+    "2013 - 2025"
+    )
+ 
+    periodo_valor2 = st.segmented_control(
+      "Selecione o Período", list(periodo2), selection_mode="single", key="segmento_periodo_valor2", default = "1987 - 2000"
+    )
 
-      st.write('Selecione o período')
-      
-      # Funções para alterar o estado
-      col1, col2, col3 = st.columns(3)
-      with col1:
-         if st.button("1987 - 2000"):
-               st.session_state['periodo_selecionado'] = '1987 - 2000'
-      with col2:
-         if st.button("2000 - 2013"):
-               st.session_state['periodo_selecionado'] = '2000 - 2013'
-      with col3:
-         if st.button("2013 - 2025"):
-               st.session_state['periodo_selecionado'] = '2013 - 2025'
-
-      # Mostra o gráfico conforme a seleção
-      if st.session_state['periodo_selecionado'] == '1987 - 2000':
+   
+    if periodo_valor2 == "1987 - 2000":     
          plot_preco_brent(df_ipea_brent, 1987, 2000,df_eventos_novos, [0, 200])
-      elif st.session_state['periodo_selecionado'] == '2000 - 2013':
+    if periodo_valor2 == "2000 - 2013": 
          plot_preco_brent(df_ipea_brent, 2000, 2013,df_eventos_novos, [0, 200])
-      elif st.session_state['periodo_selecionado'] == '2013 - 2025':
+    if periodo_valor2 == "2013 - 2025": 
          plot_preco_brent(df_ipea_brent, 2013, 2025,df_eventos_novos, [0, 200])
 
 
@@ -260,20 +350,16 @@ with tab3:
  
    
    periodo_valor = st.segmented_control(
-      "Selecione o Período", list(periodo.keys()), selection_mode="single"
+      "Selecione o Período", list(periodo.keys()), selection_mode="single", key="segmento_periodo_valor3", default= "Mensal"  
    )
    
    if periodo_valor != None:
 
       periodo_decomposicao = periodo[periodo_valor]
-
       st.write(f"Período selecionado: {periodo_decomposicao} dias")
-      
       decomposicao = seasonal_decompose(df_ipea_brent['1988-01-01':'2024-12-31']['preco_uss'], model="additive", period=periodo_decomposicao)
-
       # Gráfico de Tendência
       fig_tendencia = go.Figure()
-
       # Plotando a Tendência
       fig_tendencia.add_trace(go.Scatter(
       x=decomposicao.trend.index,
@@ -282,7 +368,6 @@ with tab3:
       name='Tendência',
       line=dict(color='blue')
       ))
-
    # Configuração do layout
       fig_tendencia.update_layout(
          title="Tendência",
@@ -294,19 +379,14 @@ with tab3:
             tickformat="%Y"
          ),
          template="plotly_dark"
-      )
-
+        )
       # Exibir gráfico no Streamlit
       st.plotly_chart(fig_tendencia)
-
       ultimo_ano = decomposicao.seasonal.index.year.max()
-
       # Filtra os dados da sazonalidade para o último ano
       dados_sazonalidade = decomposicao.seasonal[decomposicao.seasonal.index.year == ultimo_ano]
-
       # Cria o gráfico
       fig_sazonalidade = go.Figure()
-
       fig_sazonalidade.add_trace(go.Scatter(
          x=dados_sazonalidade.index,
          y=dados_sazonalidade,
@@ -314,7 +394,6 @@ with tab3:
          name=f"Sazonalidade {ultimo_ano}",
          line=dict(color='green')
       ))
-
       # Configura o layout para exibir o mês no eixo x
       fig_sazonalidade.update_layout(
          title=f"Sazonalidade de {ultimo_ano}",
@@ -325,16 +404,40 @@ with tab3:
             ticklabelmode="period"  # Garante que o label represente o início do mês
          ),
          template="plotly_dark"
-      )
-
+        )
       # Exibe o gráfico no Streamlit
       st.plotly_chart(fig_sazonalidade)
 
-
+   
 
 with tab4:
+    periodo4 = (
+    "1987 - 2000",
+    "2000 - 2013",
+    "2013 - 2025"
+    )
+ 
+   
+    periodo_valor4 = st.segmented_control(
+      "Selecione o Período", list(periodo4), selection_mode="single", key="segmento_periodo_valor4", default= "1987 - 2000"
+    )
+
+   
+    if periodo_valor4 == "1987 - 2000":
+        plot_preco_brent_anual(df_grouped, 1987, 2000)
+        plot_var_brent(df_ipea_brent, 1987, 2000)
+        
+    if periodo_valor4 == "2000 - 2013":
+        plot_preco_brent_anual(df_grouped, 2000, 2013)
+        plot_var_brent(df_ipea_brent, 2000, 2013)
+        
+    if periodo_valor4 == "2013 - 2025":
+        plot_preco_brent_anual(df_grouped, 2013, 2025)
+        plot_var_brent(df_ipea_brent, 2013, 2025)
+
+with tab5:
  st.write('''
             <div style="text-align: justify;">
                **Em breve a análise de estoques**
             </div>
-            ''', unsafe_allow_html=True)  
+            ''', unsafe_allow_html=True)
