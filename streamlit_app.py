@@ -44,7 +44,7 @@ pg = st.navigation(
     }
 )
 
-st.logo("https://raw.githubusercontent.com/nascimentorafael1/techfase4/refs/heads/main/img/preco-do-petroleo-v3.png", size= "large") 
+st.logo("img/preco-do-petroleo-v3.png", size= "large") 
 
 
 # Iniciar navegação
