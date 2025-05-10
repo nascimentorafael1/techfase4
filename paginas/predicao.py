@@ -79,7 +79,9 @@ if periodos > 0:
     
     df_modelo_prever = df_modelo_prever.head(periodos)
     
-    
+    st.write("Prévia do DataFrame passado ao Prophet:")
+    st.write(df_modelo_prever.head())
+    st.write(df_modelo_prever.dtypes)
 
     # Fazer previsão
     forecast = modelo.predict(df_modelo_prever)
