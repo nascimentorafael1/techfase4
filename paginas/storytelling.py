@@ -17,7 +17,7 @@ df_ipea_brent = pd.read_html(url
                              ,skiprows=1 
                              )[0] 
 df_ipea_brent.columns = ['data', 'preco_uss']
-df_ipea_brent['data'] = pd.to_datetime(df_ipea_brent['data'])
+df_ipea_brent['data'] = pd.to_datetime(df_ipea_brent['data'], format="%d/%m/%Y")
 df_ipea_brent['preco_uss'] = df_ipea_brent['preco_uss'].str.replace(',','.')
 df_ipea_brent['preco_uss'] = pd.Series(df_ipea_brent['preco_uss'], dtype='Float64')
 df_ipea_brent = df_ipea_brent.set_index('data')
@@ -281,7 +281,7 @@ def plot_var_brent(df, ano_inicial, ano_final):
 ######
 
 st.title('Storytelling')
-tab1, tab2, tab3, tab4, tab5 = st.tabs(["📈 Visão Geral", "💡 Insight", "📅 Análise Temporal", "↗️ Variações","🛢️ Estoques"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["📈 Visão Geral", "💡 Insight", "📅 Análise Temporal", "↗️ Variações","🛢️ Produção"])
 
 with tab1:
    st.write('Abaixo apresentamos a variação do preço brent ao longo dos anos, é possível filtrar o período e passar o mouse na linha do tempo para visualizar os valores')
@@ -438,6 +438,81 @@ with tab4:
 with tab5:
  st.write('''
             <div style="text-align: justify;">
-               **Em breve a análise de estoques**
+               **Talvez mover o mês aqui possa ser uma boa ideia e deixar 2 linhas comparativas. Ou usar dispersão **
             </div>
             ''', unsafe_allow_html=True)
+ 
+ df_ipea_brent_media = df_ipea_brent.groupby(['data','ano','mes']).preco_uss.mean().reset_index()
+ df_ipea_brent_media.set_index('data', inplace=True)
+ df_ipea_brent_media.sort_index(ascending=True, inplace=True)
+ 
+ df_prod_petroleo_soma2 = pd.read_csv('https://github.com/nascimentorafael1/techfase4/raw/refs/heads/main/data/df_eia_prod_mundial.csv')
+ df_prod_petroleo_soma2.set_index('data', inplace=True)
+ df_prod_petroleo_soma2.sort_index(ascending=True, inplace=True)
+ 
+ def plot_brent_vs_mmbpd(df_brent, df_mmbpd, ano_inicio1, ano_fim2):
+    # Filtra os DataFrames pelo intervalo de anos desejado
+    df_brent_filtrado = df_brent[(df_brent['ano'] >= ano_inicio1) & (df_brent['ano'] <= ano_fim2)]
+    df_mmbpd_filtrado = df_mmbpd[(df_mmbpd['ano'] >= ano_inicio1) & (df_mmbpd['ano'] <= ano_fim2)]
+
+    # Cria a figura
+    fig = go.Figure()
+
+    # Linha do preço do Brent (azul escuro)
+    fig.add_trace(go.Scatter(
+        x=df_brent_filtrado.index,
+        y=df_brent_filtrado['preco_uss'],
+        mode='lines',
+        name='Preço Brent (USD)',
+        line=dict(color='#0d3b66', width=3),
+        yaxis='y2'
+    ))
+
+    # Barras da produção de petróleo (azul claro)
+    fig.add_trace(go.Bar(
+        x=df_mmbpd_filtrado.index,
+        y=df_mmbpd_filtrado['valor_mensal'],
+        name='Produção de Petróleo (MMBPD)',
+        marker_color='#71C5E8',
+        yaxis='y1'
+    ))
+
+    # Layout com dois eixos Y
+    fig.update_layout(
+        title=f'Produção de Petróleo (MMBPD) vs Preço Brent (USD) — {ano_inicio1} a {ano_fim2}',
+        xaxis_title='Ano',
+        yaxis=dict(title='Produção (MMBPD)', side='left', showgrid=False),
+        yaxis2=dict(title='Preço Brent (USD)', overlaying='y', side='right'),
+        template='plotly_dark',
+        legend=dict(x=0.01, y=0.99)
+    )
+
+    # Exibe no Streamlit
+    st.plotly_chart(fig, use_container_width=True)
+    
+ periodo5 = (
+    "1987 - 2000",
+    "2000 - 2013",
+    "2013 - 2025"
+    )
+ 
+   
+ periodo_valor5 = st.segmented_control(
+      "Selecione o Período", list(periodo5), selection_mode="single", key="segmento_periodo_valor5", default= "1987 - 2000"
+    )
+
+   
+ if periodo_valor5 == "1987 - 2000":
+  plot_brent_vs_mmbpd(df_ipea_brent_media, df_prod_petroleo_soma2, 1987, 2000)
+
+        
+ if periodo_valor5 == "2000 - 2013":
+  plot_brent_vs_mmbpd(df_ipea_brent_media, df_prod_petroleo_soma2, 2000, 2013)
+
+        
+ if periodo_valor5 == "2013 - 2025":
+  plot_brent_vs_mmbpd(df_ipea_brent_media, df_prod_petroleo_soma2, 2013, 2025)
+
+
+
+
